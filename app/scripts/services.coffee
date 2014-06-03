@@ -1,21 +1,51 @@
 'use strict'
 
-apiResource = ($resource, resource, args) ->
-  $resource "/api/#{resource}/:id"
-  , # Default arguments
-    args
-  , # Override methods
-    query:
-      method: 'GET'
-      isArray: false
-    update:
-      method: 'PUT'
-
 angular.module('taarifaWaterpointsApp')
-  .factory 'Waterpoint', ($resource) ->
-    apiResource $resource, 'waterpoints'
-  .factory 'Facility', ($resource) ->
-    apiResource $resource, 'facilities'
+
+  .factory 'ApiResource', ($resource, $http, flash) ->
+    (resource, args) ->
+      Resource = $resource "/api/#{resource}/:id"
+      , # Default arguments
+        args
+      , # Override methods
+        query:
+          method: 'GET'
+          isArray: false
+      Resource.update = (id, data) ->
+        # We need to remove special attributes starting with _ since they are
+        # not defined in the schema and the data will not validate and the
+        # update be rejected
+        putdata = {}
+        for k, v of data when k[0] != '_'
+          putdata[k] = v
+        $http.put("/api/#{resource}/"+id, putdata,
+                  headers: {'If-Match': data._etag})
+        .success (data, status) ->
+          if status == 200 and data._status == 'OK'
+            flash.success = "#{resource} successfully updated!"
+          if status == 200 and data._status == 'ERR'
+            for field, message of data._issues
+              flash.error = "#{field}: #{message}"
+      Resource.patch = (id, data, etag) ->
+        $http
+          method: 'PATCH'
+          url: "/api/#{resource}/"+id
+          data: data
+          headers: {'If-Match': etag}
+      return Resource
+
+  .factory 'Waterpoint', (ApiResource) ->
+    ApiResource 'waterpoints'
+
+  .factory 'Facility', (ApiResource) ->
+    ApiResource 'facilities'
+
+  .factory 'Request', (ApiResource) ->
+    ApiResource 'requests'
+
+  .factory 'Service', (ApiResource) ->
+    ApiResource 'services'
+
   .factory 'Map', (Waterpoint) ->
     # Initially center on Dar es Salaam
     @center =
@@ -31,7 +61,10 @@ angular.module('taarifaWaterpointsApp')
           # group: p.district
           lat: p.latitude
           lng: p.longitude
-          message: "#{p.wpt_code}<br />Status: #{p.status}<br /><a href=\"#/waterpoints/edit/#{p._id}\">edit</a>"
+          message: "#{p.wpt_code}<br />" +
+            "Status: #{p.status}<br />" +
+            "<a href=\"#/waterpoints/edit/#{p._id}\">edit</a><br />" +
+            "<a href=\"#/requests/new?waterpoint_id=#{p.wpt_code}\">submit request</a>"
       # This would keep loading further waterpoints as long as there are any.
       # Disabled for performance reasons
       # if waterpoints._links.next
@@ -48,9 +81,10 @@ angular.module('taarifaWaterpointsApp')
         status: 1
     , addMarkers
     return this
+
   # Get an angular-dynamic-forms compatible form description from a Facility
   # given a facility code
-  .factory 'Form', (Facility) ->
+  .factory 'FacilityForm', (Facility) ->
     (facility_code) ->
       Facility.get(facility_code: facility_code)
         # Return a promise since dynamic-forms needs the form template in
@@ -72,6 +106,41 @@ angular.module('taarifaWaterpointsApp')
               fields[f].options = options
             fields[f].class = "form-control"
             fields[f].wrapper = '<div class="form-group"></div>'
+          fields.submit =
+            type: "submit"
+            label: "Save"
+            class: "btn btn-primary"
+          return fields
+
+  # Get an angular-dynamic-forms compatible form description from a Service
+  # given a service code
+  .factory 'RequestForm', (Service) ->
+    (service_code, params) ->
+      Service.get(service_code: service_code)
+        # Return a promise since dynamic-forms needs the form template in
+        # scope when the controller is invoked
+        .$promise.then (service) ->
+          dtype2type =
+            string: 'text'
+            text: 'textarea'
+            singlevaluelist: 'select'
+            multivaluelist: 'select'
+          fields = {}
+          for a in service._items[0].attributes when a.variable
+            fields[a.code] =
+              type: dtype2type[a.datatype] or a.datatype
+              required: a.required
+              label: a.description
+              class: "form-control"
+              wrapper: '<div class="form-group"></div>'
+              val: params[a.code]
+            if a.datatype in ['singlevaluelist', 'multivaluelist']
+              fields[a.code].multiple = a.datatype == 'multivaluelist'
+              options = {}
+              for v in a.values
+                options[v.key] =
+                  label: v.name
+              fields[a.code].options = options
           fields.submit =
             type: "submit"
             label: "Save"

@@ -70,7 +70,7 @@ module.exports = function (grunt) {
       options: {
         port: 9000,
         // Change this to '0.0.0.0' to access the server from outside.
-        hostname: 'localhost',
+        hostname: '0.0.0.0',
         livereload: 35729
       },
       livereload: {
@@ -362,9 +362,31 @@ module.exports = function (grunt) {
         configFile: 'karma.conf.js',
         singleRun: true
       }
+    },
+
+    //Translation string extraction
+    nggettext_extract: {
+        pot: {
+            files: {
+                'app/po/template.pot': ['app/*.html','app/views/*.html']
+            }
+        },
+    },
+
+    //Compile translated po files into js
+    nggettext_compile: {
+        all: {
+            options: {
+                'module': "taarifaWaterpointsApp"
+            },
+            files: {
+                'app/scripts/translations.js': ['app/po/*.po']
+            }
+        },
     }
   });
 
+  grunt.loadNpmTasks('grunt-angular-gettext');
 
   grunt.registerTask('serve', function (target) {
     if (target === 'dist') {
@@ -396,6 +418,8 @@ module.exports = function (grunt) {
 
   grunt.registerTask('build', [
     'clean:dist',
+    'nggettext_extract',
+    'nggettext_compile',
     'useminPrepare',
     'concurrent:dist',
     'autoprefixer',

@@ -97,7 +97,7 @@ waterpoint_schema = {
     'status': {
         'type': 'string',
         'label': 'Status',
-        'allowed': ['Functional', 'Not functional'],
+        'allowed': ['Functional', 'Not functional', 'Needs repair'],
     },
     'breakdown_year': {
         'type': 'datetime',
@@ -198,10 +198,19 @@ service_schema = {
          "datatype_description": "Select an option from the list",
          "order": 2,
          "description": "Status of this waterpoint (functional, broken)",
-         "values": [{"key": "functional",
+         "values": [{"key": "Functional",
                      "name": "This waterpoint is functional"},
-                    {"key": "not functional",
-                     "name": "This waterpoint is broken"}]}
+                    {"key": "Not functional",
+                     "name": "This waterpoint is broken"},
+                    {"key": "Needs repair",
+                     "name": "This waterpoint needs repair"}]},
+        {"variable": True,
+         "code": "status_detail",
+         "datatype": "string",
+         "required": False,
+         "datatype_description": "Describe the status of the waterpoint",
+         "order": 3,
+         "description": "Detailed description of the waterpoint status"}
     ],
     "description": "Location and functionality of a waterpoint",
     "keywords": ["location", "infrastructure", "water"],
